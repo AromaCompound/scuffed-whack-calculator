@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Calculator</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #e8e8e8;
+      font-family: 'Courier New', monospace;
+    }
+
+    .calculator {
+      background: #d4d0c8;
+      border-radius: 6px;
+      padding: 16px;
+      box-shadow:
+        2px 2px 0 #ffffff,
+        -2px -2px 0 #a0a0a0,
+        4px 4px 8px rgba(0,0,0,0.3);
+      width: 260px;
+      transition: transform 0.6s cubic-bezier(.4, 0, .2, 1), margin-top 0.8s cubic-bezier(.2, 0, .4, 1.4);
+    }
+
+    .calculator.too-heavy {
+      margin-top: 60vh;
+    }
+
+    .calculator.flipped {
+      transform: rotate(180deg) !important;
+      transition: transform 0.8s cubic-bezier(.4,0,.2,1) !important;
+    }
+
+    .calculator.flip-back {
+      transform: rotate(0deg) !important;
+      transition: transform 0.8s cubic-bezier(.4,0,.2,1) !important;
+    }
+
+    /* --- Pi quirk --- */
+    .pi-mode .calculator {
+      width: 260px !important;
+      height: 260px !important;
+      border-radius: 50% !important;
+      overflow: hidden !important;
+      transition: border-radius 0.6s ease, height 0.6s ease !important;
+    }
+
+    .pi-mode button {
+      border-radius: 50% !important;
+      transition: border-radius 0.6s ease !important;
+    }
+
+    .pi-mode .display {
+      border-radius: 50% !important;
+      transition: border-radius 0.6s ease !important;
+    }
+
+    .pi-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 997;
+      cursor: not-allowed;
+    }
+
+    /* --- Crash quirk --- */
+    .calc-ghost {
+      position: fixed;
+      width: 260px;
+      pointer-events: none;
+      opacity: 1 !important;
+      z-index: 996;
+      transition: none !important;
+      animation: none !important;
+    }
+
+    .calc-ghost * {
+      transition: none !important;
+      animation: none !important;
+    }
+
+    #crash-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #0078d7;
+      z-index: 9999;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 10vw;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      color: white;
+    }
+
+    #crash-overlay.visible {
+      display: flex;
+    }
+
+    .bsod-emoji {
+      font-size: 80px;
+      font-weight: 100;
+      margin-bottom: 24px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+
+    .bsod-title {
+      font-size: 28px;
+      font-weight: 400;
+      margin-bottom: 20px;
+    }
+
+    .bsod-sub {
+      font-size: 16px;
+      line-height: 1.7;
+      margin-bottom: 32px;
+      max-width: 540px;
+    }
+
+    .bsod-code {
+      font-size: 13px;
+      opacity: 0.75;
+      margin-bottom: 48px;
+      font-family: monospace;
+    }
+
+    .bsod-hint {
+      font-size: 13px;
+      opacity: 0.6;
+      border-top: 1px solid rgba(255,255,255,0.3);
+      padding-top: 16px;
+      max-width: 500px;
+    }
+
+    .display {
+      background: #c8d8a0;
+      border: inset 2px;
+      border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;
+      padding: 8px 12px;
+      text-align: right;
+      margin-bottom: 12px;
+      border-radius: 2px;
+    }
+
+    .display .expr {
+      font-size: 11px;
+      color: #6a7a50;
+      min-height: 16px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .display .result {
+      font-size: 28px;
+      color: #2a3a10;
+      font-weight: bold;
+      letter-spacing: 1px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .display .result.long-msg {
+      font-size: 11px;
+      letter-spacing: 0px;
+      white-space: normal;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    button {
+      padding: 12px 0;
+      font-size: 15px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 3px;
+      border: none;
+      background: #d4d0c8;
+      color: #1a1a1a;
+      box-shadow:
+        1px 1px 0 #ffffff,
+        -1px -1px 0 #a0a0a0,
+        2px 2px 4px rgba(0,0,0,0.2);
+      transition: box-shadow 0.05s, transform 0.05s;
+    }
+
+    button:active {
+      box-shadow:
+        -1px -1px 0 #ffffff,
+        1px 1px 0 #a0a0a0,
+        inset 1px 1px 3px rgba(0,0,0,0.2);
+      transform: translate(1px, 1px);
+    }
+
+    button.op {
+      color: #003399;
+    }
+
+    button.eq {
+      background: #a0b870;
+      color: #1a2a00;
+      box-shadow:
+        1px 1px 0 #c8d890,
+        -1px -1px 0 #708840,
+        2px 2px 4px rgba(0,0,0,0.2);
+    }
+
+    button.eq:active {
+      box-shadow:
+        -1px -1px 0 #c8d890,
+        1px 1px 0 #708840,
+        inset 1px 1px 3px rgba(0,0,0,0.2);
+    }
+
+    button.clear {
+      color: #990000;
+    }
+
+    button.span2 {
+      grid-column: span 2;
+    }
+
+    #btn-zero {
+      transition: box-shadow 0.05s, transform 0.05s, top 0.4s cubic-bezier(.17,.67,.35,1.4), left 0.4s cubic-bezier(.17,.67,.35,1.4);
+    }
+
+    #btn-zero.escaped {
+      position: fixed;
+      z-index: 999;
+      width: 60px;
+      grid-column: unset;
+    }
+
+    .zero-ghost {
+      grid-column: span 2;
+      background: transparent;
+      border: 2px dashed #b0b0b0;
+      border-radius: 3px;
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    /* --- Tickle quirk --- */
+    @keyframes tickle {
+      0%   { transform: translate(0, 0) rotate(0deg); }
+      10%  { transform: translate(-8px, -6px) rotate(-3deg); }
+      20%  { transform: translate(10px, -4px) rotate(3deg); }
+      30%  { transform: translate(-12px, 6px) rotate(-4deg); }
+      40%  { transform: translate(8px, 8px) rotate(2deg); }
+      50%  { transform: translate(-6px, -10px) rotate(-3deg); }
+      60%  { transform: translate(12px, 4px) rotate(4deg); }
+      70%  { transform: translate(-10px, 8px) rotate(-2deg); }
+      80%  { transform: translate(6px, -6px) rotate(3deg); }
+      90%  { transform: translate(-4px, 4px) rotate(-1deg); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    .calculator.tickled {
+      animation: tickle 0.6s ease-in-out;
+    }
+    #btn-six.dancing, #btn-seven.dancing {
+      position: fixed;
+      z-index: 998;
+      transition: top 0.18s ease-in-out, left 0.18s ease-in-out;
+    }
+
+    /* --- Quirk Log --- */
+    #quirk-log {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 1000;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+
+    #quirk-toggle {
+      background: #d4d0c8;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      font-weight: bold;
+      color: #1a1a1a;
+      box-shadow: 1px 1px 0 #ffffff, -1px -1px 0 #a0a0a0, 2px 2px 4px rgba(0,0,0,0.2);
+      user-select: none;
+    }
+
+    #quirk-toggle:active {
+      box-shadow: -1px -1px 0 #ffffff, 1px 1px 0 #a0a0a0, inset 1px 1px 3px rgba(0,0,0,0.2);
+      transform: translate(1px,1px);
+    }
+
+    #quirk-panel {
+      display: none;
+      margin-top: 6px;
+      background: #d4d0c8;
+      border-radius: 3px;
+      box-shadow: 1px 1px 0 #ffffff, -1px -1px 0 #a0a0a0, 3px 3px 6px rgba(0,0,0,0.2);
+      width: 220px;
+      overflow: hidden;
+    }
+
+    #quirk-panel.open {
+      display: block;
+    }
+
+    #quirk-panel h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #555;
+      padding: 7px 10px 5px;
+      border-bottom: 1px solid #b0b0b0;
+      margin: 0;
+    }
+
+    #quirk-list {
+      list-style: none;
+      padding: 6px 0;
+      margin: 0;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    #quirk-list li {
+      padding: 5px 10px;
+      border-bottom: 1px solid #c0bdb5;
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      line-height: 1.4;
+    }
+
+    #quirk-list li:last-child {
+      border-bottom: none;
+    }
+
+    #quirk-list .q-num {
+      color: #888;
+      min-width: 16px;
+    }
+
+    #quirk-list .q-active {
+      color: #2a2;
+      font-size: 10px;
+      margin-top: 2px;
+    }
+
+    #quirk-list .q-inactive {
+      color: #aaa;
+      font-size: 10px;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <!-- BSOD overlay -->
+  <div id="crash-overlay">
+    <div class="bsod-emoji">:(</div>
+    <div class="bsod-title">Your calculator ran into a problem.</div>
+    <div class="bsod-sub">It got tired of your nonsense and decided to give up.<br>We're just as surprised as you are.</div>
+    <div class="bsod-code">STOP: 0x000000EA — CALCULATOR_EXHAUSTED_BY_USER</div>
+    <div class="bsod-hint">You can close this by pressing Esc or F11, then reload the page.</div>
+  </div>
+
+  <!-- Quirk Log -->
+  <div id="quirk-log">
+    <button id="quirk-toggle" onclick="toggleQuirkPanel()">🎪 Quirks ▾</button>
+    <div id="quirk-panel">
+      <h3>Active Quirks</h3>
+      <ul id="quirk-list">
+        <li id="q1">
+          <span class="q-num">1.</span>
+          <span class="q-text">Squish &amp; Squash — resize the window to warp the whole calculator</span>
+          <span class="q-active" id="q1-status">●</span>
+        </li>
+        <li id="q2">
+          <span class="q-num">2.</span>
+          <span class="q-text">No Zero on Division — press ÷ and the 0 button hops away</span>
+          <span class="q-inactive" id="q2-status">●</span>
+        </li>
+        <li id="q3">
+          <span class="q-num">3.</span>
+          <span class="q-text">8008 — you know what it is. keep pressing = to find out what happens</span>
+          <span class="q-inactive" id="q3-status">●</span>
+        </li>
+        <li id="q4">
+          <span class="q-num">4.</span>
+          <span class="q-text">Too Heavy — type a 100+ digit number and the calculator sinks to the bottom</span>
+          <span class="q-inactive" id="q4-status">●</span>
+        </li>
+        <li id="q5">
+          <span class="q-num">5.</span>
+          <span class="q-text">67 — press = 67 times and buttons 6 &amp; 7 do the trend</span>
+          <span class="q-inactive" id="q5-status">●</span>
+        </li>
+        <li id="q6">
+          <span class="q-num">6.</span>
+          <span class="q-text">Ticklish — click the calculator border 10 times in 3 seconds and it squirms away</span>
+          <span class="q-inactive" id="q6-status">●</span>
+        </li>
+        <li id="q7">
+          <span class="q-num">7.</span>
+          <span class="q-text">BOOBLESS — enter 55378008, press = three times for a surprise. press = once more for encouragement 🙏</span>
+          <span class="q-inactive" id="q7-status">●</span>
+        </li>
+        <li id="q8">
+          <span class="q-num">8.</span>
+          <span class="q-text">9+10 — you already know what happens</span>
+          <span class="q-inactive" id="q8-status">●</span>
+        </li>
+        <li id="q9">
+          <span class="q-num">9.</span>
+          <span class="q-text">Pi — enter the first 10 digits of pi and everything goes circular for 10 seconds</span>
+          <span class="q-inactive" id="q9-status">●</span>
+        </li>
+        <li id="q10">
+          <span class="q-num">10.</span>
+          <span class="q-text">Annoy the Error — get an Error then press = 100 times. good luck twin 🫡</span>
+          <span class="q-inactive" id="q10-status">●</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="calculator">
+    <div class="display">
+      <div class="expr" id="expr"></div>
+      <div class="result" id="result">0</div>
+    </div>
+    <div class="buttons">
+      <button class="clear span2" onclick="clearAll()">AC</button>
+      <button class="op" onclick="deleteLast()">⌫</button>
+      <button class="op" onclick="input('/'); escapeZero()">÷</button>
+
+      <button onclick="input('7')" id="btn-seven">7</button>
+      <button onclick="input('8')">8</button>
+      <button onclick="input('9')">9</button>
+      <button class="op" onclick="input('*')">×</button>
+
+      <button onclick="input('4')">4</button>
+      <button onclick="input('5')">5</button>
+      <button onclick="input('6')" id="btn-six">6</button>
+      <button class="op" onclick="input('-')">−</button>
+
+      <button onclick="input('1')">1</button>
+      <button onclick="input('2')">2</button>
+      <button onclick="input('3')">3</button>
+      <button class="op" onclick="input('+')">+</button>
+
+      <button id="btn-zero" class="span2" onclick="input('0')">0</button>
+      <button onclick="input('.')">.</button>
+      <button class="eq" onclick="calculate()">=</button>
+    </div>
+  </div>
+
+  <script>
+    let current = '';
+    let justCalc = false;
+
+    const resultEl = document.getElementById('result');
+    const exprEl = document.getElementById('expr');
+    const calcEl = document.querySelector('.calculator');
+
+    function setResult(text) {
+      resultEl.textContent = text;
+      resultEl.classList.toggle('long-msg', String(text).length > 10);
+    }
+
+    function checkWeight(text) {
+      const digits = String(text).replace(/[^0-9]/g, '').length;
+      if (digits > 100) {
+        calcEl.classList.add('too-heavy');
+        setQuirkStatus('q4', true);
+      } else {
+        calcEl.classList.remove('too-heavy');
+        setQuirkStatus('q4', false);
+      }
+    }
+
+    function input(val) {
+      if (justCalc && !isNaN(val)) {
+        current = '';
+        // Starting fresh — unflip if flipped
+        unflipCalculator();
+        booblessCount = 0;
+        setQuirkStatus('q7', false);
+      }
+      justCalc = false;
+
+      // Block 0 input while zero button is escaped
+      if (val === '0' && zeroEscaped) return;
+
+      // Prevent multiple decimals in current number
+      if (val === '.') {
+        const parts = current.split(/[\+\-\*\/]/);
+        const last = parts[parts.length - 1];
+        if (last.includes('.')) return;
+      }
+
+      current += val;
+      setResult(current || '0');
+      checkWeight(current);
+      exprEl.textContent = '';
+    }
+
+    function clearAll() {
+      current = '';
+      justCalc = false;
+      boobEqualCount = 0;
+      sixtySevenCount = 0;
+      booblessCount = 0;
+      setQuirkStatus('q3', false);
+      setQuirkStatus('q5', false);
+      setQuirkStatus('q7', false);
+      setQuirkStatus('q8', false);
+      setQuirkStatus('q9', false);
+      piCount = 0;
+      setResult('0');
+      unflipCalculator();
+      checkWeight('');
+      exprEl.textContent = '';
+      returnZero();
+    }
+
+    function deleteLast() {
+      if (justCalc) { clearAll(); return; }
+      current = current.slice(0, -1);
+      // If the division sign was just removed, bring zero back
+      if (zeroEscaped && !current.includes('/')) returnZero();
+      setResult(current || '0');
+      checkWeight(current);
+    }
+
+    let boobEqualCount = 0;
+
+    function calculate() {
+      if (!current) {
+        checkErrorSpam();
+        return;
+      }
+
+      // 8008 quirk
+      if (current.trim() === '8008') {
+        boobEqualCount++;
+        setQuirkStatus('q3', true);
+        if (boobEqualCount === 1) {
+          exprEl.textContent = '8008 =';
+          setResult('8008');
+          current = '8008';
+          justCalc = true;
+          return;
+        } else if (boobEqualCount === 2) {
+          exprEl.textContent = '8008 =';
+          setResult('8008');
+          current = '8008';
+          justCalc = true;
+          return;
+        } else if (boobEqualCount === 3) {
+          exprEl.textContent = '8008 =';
+          setResult('8008');
+          current = '8008';
+          justCalc = true;
+          return;
+        } else if (boobEqualCount === 4) {
+          exprEl.textContent = '';
+          setResult("You ain't gettin that sadly.");
+          current = '8008';
+          justCalc = true;
+          return;
+        } else {
+          exprEl.textContent = '';
+          setResult("unless if you're a girl then idc.");
+          boobEqualCount = 0;
+          setQuirkStatus('q3', false);
+          current = '8008';
+          justCalc = true;
+          return;
+        }
+      }
+
+      // reset boob counter if something else is calculated
+      boobEqualCount = 0;
+      setQuirkStatus('q3', false);
+
+      // 67 quirk
+      if (current.trim() === '67') {
+        sixtySevenCount++;
+        setQuirkStatus('q5', true);
+        if (sixtySevenCount < 67) {
+          exprEl.textContent = '67 =';
+          setResult('67');
+          current = '67';
+          justCalc = true;
+          return;
+        } else if (sixtySevenCount === 67) {
+          exprEl.textContent = '';
+          setResult('Are you sure?');
+          current = '67';
+          justCalc = true;
+          return;
+        } else {
+          // kick off the dance!
+          exprEl.textContent = '';
+          setResult('🕺');
+          current = '67';
+          justCalc = true;
+          do67Dance();
+          return;
+        }
+      }
+
+      // reset 67 counter if something else is calculated
+      sixtySevenCount = 0;
+      setQuirkStatus('q5', false);
+
+      // --- 55378008 / BOOBLESS quirk ---
+      if (current.trim() === '55378008') {
+        booblessCount++;
+        setQuirkStatus('q7', true);
+        if (booblessCount < 3) {
+          exprEl.textContent = '55378008 =';
+          setResult('55378008');
+          current = '55378008';
+          justCalc = true;
+          return;
+        } else if (booblessCount === 3) {
+          exprEl.textContent = '';
+          setResult('55378008');
+          flipCalculator(true);
+          current = '55378008';
+          justCalc = true;
+          return;
+        } else if (booblessCount === 4) {
+          exprEl.textContent = '';
+          setResult("Don't judge urself cuh, ur awesome");
+          current = '55378008';
+          justCalc = true;
+          return;
+        } else {
+          return; // stay flipped until AC or new number
+        }
+      }
+
+      // reset boobless if something else calculated
+      booblessCount = 0;
+      setQuirkStatus('q7', false);
+      unflipCalculator();
+
+      // --- 9+10 quirk ---
+      if (current.replace(/\s/g, '') === '9+10') {
+        setQuirkStatus('q8', true);
+        exprEl.textContent = '9 + 10 =';
+        setResult("Its either 19 or 21.");
+        current = '';
+        justCalc = true;
+        setTimeout(() => setQuirkStatus('q8', false), 2000);
+        return;
+      }
+
+      // --- Pi quirk ---
+      if (current.trim() === PI_DIGITS) {
+        piCount++;
+        setQuirkStatus('q9', true);
+        if (piCount < 3) {
+          exprEl.textContent = '3.141592653 =';
+          setResult('3.141592653');
+          current = PI_DIGITS;
+          justCalc = true;
+          return;
+        } else {
+          piCount = 0;
+          triggerPiMode();
+          return;
+        }
+      }
+
+      // reset pi counter if something else calculated
+      piCount = 0;
+      setQuirkStatus('q9', false);
+
+      try {
+        const expr = current.replace(/×/g, '*').replace(/÷/g, '/');
+        const res = Function('"use strict"; return (' + expr + ')')();
+        const rounded = parseFloat(res.toFixed(10));
+        exprEl.textContent = current + ' =';
+        setResult(rounded);
+        checkWeight(rounded);
+        current = String(rounded);
+        justCalc = true;
+        returnZero();
+      } catch {
+        setResult('Error');
+        current = '';
+        checkErrorSpam();
+      }
+    }
+
+    // --- BOOBLESS quirk ---
+    let booblessCount = 0;
+    let isFlipped = false;
+
+    function flipCalculator(flip) {
+      if (flip && !isFlipped) {
+        isFlipped = true;
+        calcEl.classList.remove('flip-back');
+        void calcEl.offsetWidth;
+        calcEl.classList.add('flipped');
+      }
+    }
+
+    function unflipCalculator() {
+      if (!isFlipped) return;
+      isFlipped = false;
+      calcEl.classList.remove('flipped');
+      void calcEl.offsetWidth;
+      calcEl.classList.add('flip-back');
+      calcEl.addEventListener('transitionend', function h() {
+        calcEl.removeEventListener('transitionend', h);
+        calcEl.classList.remove('flip-back');
+      });
+    }
+
+    // --- Quirk log ---
+    function toggleQuirkPanel() {
+      document.getElementById('quirk-panel').classList.toggle('open');
+    }
+
+    function setQuirkStatus(id, active) {
+      const el = document.getElementById(id + '-status');
+      el.className = active ? 'q-active' : 'q-inactive';
+      el.title = active ? 'Active' : 'Inactive';
+    }
+
+    // Close panel when clicking outside
+    document.addEventListener('click', (e) => {
+      const log = document.getElementById('quirk-log');
+      if (!log.contains(e.target)) {
+        document.getElementById('quirk-panel').classList.remove('open');
+      }
+    });
+
+    // --- Zero escape on divide ---
+    const zeroBtn = document.getElementById('btn-zero');
+    let zeroEscaped = false;
+
+    function escapeZero() {
+      if (zeroEscaped) return;
+      zeroEscaped = true;
+
+      // Grab zero's current screen position before detaching
+      const rect = zeroBtn.getBoundingClientRect();
+
+      // Insert a ghost placeholder so the grid doesn't collapse
+      const ghost = document.createElement('div');
+      ghost.className = 'zero-ghost';
+      zeroBtn.parentNode.insertBefore(ghost, zeroBtn);
+
+      // Detach and fix-position at original spot
+      document.body.appendChild(zeroBtn);
+      zeroBtn.classList.add('escaped');
+      zeroBtn.style.top = rect.top + 'px';
+      zeroBtn.style.left = rect.left + 'px';
+      zeroBtn.style.width = rect.width + 'px';
+      zeroBtn.style.height = rect.height + 'px';
+
+      // Disable while escaped
+      zeroBtn.disabled = true;
+      zeroBtn.style.opacity = '0.4';
+      zeroBtn.style.cursor = 'not-allowed';
+      setQuirkStatus('q2', true);
+
+      // Hop outside the calculator — always to the left or right edge, clear of the calc
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const calcRect = calcEl.getBoundingClientRect();
+          const btnW = rect.width;
+          const btnH = rect.height;
+          let newLeft, newTop;
+
+          if (Math.random() < 0.5) {
+            // left side of calculator
+            newLeft = Math.max(8, calcRect.left - btnW - 16);
+          } else {
+            // right side of calculator
+            newLeft = Math.min(window.innerWidth - btnW - 8, calcRect.right + 16);
+          }
+          // vertically centered near the calculator, with a little random offset
+          newTop = calcRect.top + (calcRect.height / 2) - (btnH / 2) + (Math.random() - 0.5) * 60;
+          newTop = Math.max(8, Math.min(window.innerHeight - btnH - 8, newTop));
+
+          zeroBtn.style.left = newLeft + 'px';
+          zeroBtn.style.top = newTop + 'px';
+        });
+      });
+    }
+
+    function returnZero() {
+      if (!zeroEscaped) return;
+      zeroEscaped = false;
+
+      const ghost = document.querySelector('.zero-ghost');
+      const ghostRect = ghost.getBoundingClientRect();
+
+      // Animate back
+      zeroBtn.style.top = ghostRect.top + 'px';
+      zeroBtn.style.left = ghostRect.left + 'px';
+
+      zeroBtn.addEventListener('transitionend', function handler() {
+        zeroBtn.removeEventListener('transitionend', handler);
+        zeroBtn.classList.remove('escaped');
+        zeroBtn.style.top = '';
+        zeroBtn.style.left = '';
+        zeroBtn.style.width = '';
+        zeroBtn.style.height = '';
+        zeroBtn.disabled = false;
+        zeroBtn.style.opacity = '';
+        zeroBtn.style.cursor = '';
+        setQuirkStatus('q2', false);
+        ghost.parentNode.insertBefore(zeroBtn, ghost);
+        ghost.remove();
+      });
+    }
+
+    // --- 67 quirk ---
+    let sixtySevenCount = 0;
+    let sixtySevenActive = false;
+    const btn6 = document.getElementById('btn-six');
+    const btn7 = document.getElementById('btn-seven');
+
+    function do67Dance() {
+      if (sixtySevenActive) return;
+      sixtySevenActive = true;
+      setQuirkStatus('q5', true);
+
+      const rect6 = btn6.getBoundingClientRect();
+      const rect7 = btn7.getBoundingClientRect();
+      const calcRect = calcEl.getBoundingClientRect();
+
+      // Ghost placeholders
+      const ghost6 = document.createElement('div');
+      ghost6.className = 'zero-ghost';
+      const ghost7 = document.createElement('div');
+      ghost7.className = 'zero-ghost';
+      btn6.parentNode.insertBefore(ghost6, btn6);
+      btn7.parentNode.insertBefore(ghost7, btn7);
+
+      // Detach both buttons
+      document.body.appendChild(btn6);
+      document.body.appendChild(btn7);
+      btn6.classList.add('dancing');
+      btn7.classList.add('dancing');
+      btn6.disabled = true;
+      btn7.disabled = true;
+
+      // Anchor them at original positions first
+      btn6.style.left = rect6.left + 'px';
+      btn6.style.top  = rect6.top  + 'px';
+      btn6.style.width = rect6.width + 'px';
+      btn6.style.height = rect6.height + 'px';
+      btn7.style.left = rect7.left + 'px';
+      btn7.style.top  = rect7.top  + 'px';
+      btn7.style.width = rect7.width + 'px';
+      btn7.style.height = rect7.height + 'px';
+
+      // 6 goes to the LEFT side, 7 goes to the RIGHT side
+      const leftX  = Math.max(8, calcRect.left - rect6.width - 12);
+      const rightX = Math.min(window.innerWidth - rect7.width - 8, calcRect.right + 12);
+      const midY   = calcRect.top + calcRect.height / 2;
+      const upY    = calcRect.top + 8;
+      const downY  = calcRect.bottom - rect6.height - 8;
+
+      // Build 7 alternating swing steps:
+      // step: [btn6Y, btn7Y] — they alternate up/down opposite each other
+      const steps = [];
+      for (let i = 0; i < 7; i++) {
+        if (i % 2 === 0) {
+          steps.push([upY, downY]);   // 6 up, 7 down
+        } else {
+          steps.push([downY, upY]);   // 6 down, 7 up
+        }
+      }
+
+      let step = 0;
+
+      function moveToSide() {
+        btn6.style.left = leftX  + 'px';
+        btn6.style.top  = midY   + 'px';
+        btn7.style.left = rightX + 'px';
+        btn7.style.top  = midY   + 'px';
+      }
+
+      function doStep() {
+        if (step >= steps.length) {
+          returnButtons();
+          return;
+        }
+        btn6.style.top = steps[step][0] + 'px';
+        btn7.style.top = steps[step][1] + 'px';
+        step++;
+        setTimeout(doStep, 260);
+      }
+
+      function returnButtons() {
+        const g6rect = ghost6.getBoundingClientRect();
+        const g7rect = ghost7.getBoundingClientRect();
+        btn6.style.left = g6rect.left + 'px';
+        btn6.style.top  = g6rect.top  + 'px';
+        btn7.style.left = g7rect.left + 'px';
+        btn7.style.top  = g7rect.top  + 'px';
+
+        setTimeout(() => {
+          [btn6, btn7].forEach((b, i) => {
+            b.classList.remove('dancing');
+            b.style.left = ''; b.style.top = '';
+            b.style.width = ''; b.style.height = '';
+            b.disabled = false;
+          });
+          ghost6.parentNode.insertBefore(btn6, ghost6); ghost6.remove();
+          ghost7.parentNode.insertBefore(btn7, ghost7); ghost7.remove();
+          sixtySevenActive = false;
+          sixtySevenCount = 0;
+          setQuirkStatus('q5', false);
+          setResult('67');
+          exprEl.textContent = '67 =';
+        }, 350);
+      }
+
+      // First move them to the sides, then start swinging
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          moveToSide();
+          setTimeout(doStep, 300);
+        });
+      });
+    }
+
+    // --- Tickle quirk ---
+    const BORDER_THRESHOLD = 10; // px from edge counts as border click
+    const TICKLE_CLICKS = 10;
+    const TICKLE_WINDOW = 3000; // 3 seconds
+    let tickleClicks = [];
+
+    calcEl.addEventListener('click', (e) => {
+      const rect = calcEl.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const onBorder = (
+        x <= BORDER_THRESHOLD || x >= rect.width - BORDER_THRESHOLD ||
+        y <= BORDER_THRESHOLD || y >= rect.height - BORDER_THRESHOLD
+      );
+      if (!onBorder) return;
+
+      const now = Date.now();
+      tickleClicks.push(now);
+      // Keep only clicks within the last 3 seconds
+      tickleClicks = tickleClicks.filter(t => now - t <= TICKLE_WINDOW);
+
+      if (tickleClicks.length >= TICKLE_CLICKS) {
+        tickleClicks = [];
+        triggerTickle();
+      }
+    });
+
+    function triggerTickle() {
+      setQuirkStatus('q6', true);
+      calcEl.classList.remove('tickled'); // reset if already running
+      void calcEl.offsetWidth;           // force reflow so animation restarts
+      calcEl.classList.add('tickled');
+      calcEl.addEventListener('animationend', function handler() {
+        calcEl.removeEventListener('animationend', handler);
+        calcEl.classList.remove('tickled');
+        setQuirkStatus('q6', false);
+      });
+    }
+
+    // --- Crash quirk ---
+    let errorEqualCount = 0;
+    let crashSequenceActive = false;
+
+    function checkErrorSpam() {
+      if (crashSequenceActive) return;
+      const isError = resultEl.textContent === 'Error';
+      if (!isError) { errorEqualCount = 0; return; }
+
+      errorEqualCount++;
+      setQuirkStatus('q10', true);
+
+      if (errorEqualCount >= 100) {
+        errorEqualCount = 0;
+        startCrashSequence();
+      }
+    }
+
+
+    function startCrashSequence() {
+      crashSequenceActive = true;
+
+      // Phase 1 — "you blind or som?" for 10 seconds, calculator disabled
+      setResult('you blind or som?');
+      exprEl.textContent = '';
+      current = '';
+      calcEl.style.pointerEvents = 'none';
+
+      setTimeout(() => {
+        // Phase 2 — "brace for impact twin." + duplicate trail for 3 seconds
+        setResult('brace for impact twin.');
+
+        const calcRect = calcEl.getBoundingClientRect();
+        const ghosts = [];
+        const positions = [
+          { x: calcRect.left + 40,  y: calcRect.top - 40  },
+          { x: calcRect.left + 80,  y: calcRect.top - 80  },
+          { x: calcRect.left + 120, y: calcRect.top - 120 },
+          { x: calcRect.left - 40,  y: calcRect.top + 40  },
+          { x: calcRect.left - 80,  y: calcRect.top + 80  },
+          { x: calcRect.left + 160, y: calcRect.top - 30  },
+          { x: calcRect.left - 120, y: calcRect.top + 20  },
+          { x: calcRect.left + 200, y: calcRect.top + 60  },
+          { x: calcRect.left - 160, y: calcRect.top - 60  },
+          { x: calcRect.left + 240, y: calcRect.top - 100 },
+          { x: calcRect.left - 200, y: calcRect.top + 100 },
+          { x: calcRect.left + 280, y: calcRect.top + 20  },
+          { x: calcRect.left - 240, y: calcRect.top - 20  },
+          { x: calcRect.left + 60,  y: calcRect.top + 120 },
+          { x: calcRect.left - 60,  y: calcRect.top - 120 },
+          { x: calcRect.left + 320, y: calcRect.top - 60  },
+          { x: calcRect.left - 280, y: calcRect.top + 60  },
+          { x: calcRect.left + 140, y: calcRect.top + 160 },
+          { x: calcRect.left - 140, y: calcRect.top - 160 },
+          { x: calcRect.left + 360, y: calcRect.top + 100 },
+        ];
+
+        positions.forEach((pos, i) => {
+          setTimeout(() => {
+            const ghost = calcEl.cloneNode(true);
+            ghost.classList.add('calc-ghost');
+            ghost.removeAttribute('id');
+            ghost.style.transform = '';
+            ghost.style.marginTop = '';
+            ghost.style.left = pos.x + 'px';
+            ghost.style.top  = pos.y + 'px';
+            document.body.appendChild(ghost);
+            ghosts.push(ghost);
+          }, i * 120);
+        });
+
+        // Phase 3 — fullscreen BSOD after 3 seconds
+        setTimeout(() => {
+          ghosts.forEach(g => g.remove());
+          document.documentElement.requestFullscreen().catch(() => {});
+          document.getElementById('crash-overlay').classList.add('visible');
+        }, 3000);
+
+      }, 10000);
+    }
+
+    // --- Pi quirk ---
+    // First 10 digits of pi: 3141592653
+    const PI_DIGITS = '3.141592653';
+    let piCount = 0;
+
+    function triggerPiMode() {
+      setQuirkStatus('q9', true);
+
+      // Block all input with overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'pi-overlay';
+      document.body.appendChild(overlay);
+
+      // Go circular
+      document.body.classList.add('pi-mode');
+      exprEl.textContent = 'π = 3.141592653...';
+      setResult('🥧');
+
+      // After 10 seconds, revert
+      setTimeout(() => {
+        document.body.classList.remove('pi-mode');
+        overlay.remove();
+        setQuirkStatus('q9', false);
+        setResult('0');
+        exprEl.textContent = '';
+        current = '';
+        justCalc = false;
+      }, 10000);
+    }
+
+    // --- Warp effect ---
+    function updateWarp() {
+      const ratio = window.innerWidth / window.innerHeight;
+      const scaleX = Math.pow(ratio, 0.8);
+      const scaleY = Math.pow(1 / ratio, 0.8);
+      calcEl.style.transform = `scaleX(${scaleX.toFixed(3)}) scaleY(${scaleY.toFixed(3)})`;
+      calcEl.style.transformOrigin = 'center center';
+    }
+
+    updateWarp();
+    window.addEventListener('resize', updateWarp);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key >= '0' && e.key <= '9') input(e.key);
+      else if (e.key === '.') input('.');
+      else if (e.key === '+') input('+');
+      else if (e.key === '-') input('-');
+      else if (e.key === '*') input('*');
+      else if (e.key === '/') { e.preventDefault(); input('/'); escapeZero(); }
+      else if (e.key === 'Enter' || e.key === '=') calculate();
+      else if (e.key === 'Backspace') deleteLast();
+      else if (e.key === 'Escape') clearAll();
+    });
+  </script>
+</body>
+</html>
